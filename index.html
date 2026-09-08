@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<meta name="description" content="Mahjong Solitaire em português, fácil de jogar e sempre com solução.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Mahjong da Mamãe</title>
+<style>
+  :root{
+    --felt1:#14532d; --felt2:#0b3a1f;
+    --ink:#f3f6f2; --dim:#a9c2b1;
+    --bar:#0e2f1c; --bar2:#123f26;
+    --gold:#f2c14e; --danger:#e5695f;
+    --tile-face:#fbf7ea; --tile-face2:#eee5cb;
+    --tile-edge:#b9a87e; --tile-side:#a8946a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overscroll-behavior:none}
+  body{
+    background:radial-gradient(120% 90% at 50% 0%, var(--felt1), var(--felt2));
+    color:var(--ink); font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden; touch-action:manipulation;
+    padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  /* ---------- barras ---------- */
+  .bar{
+    flex:none; display:flex; align-items:center; gap:8px; padding:8px 10px;
+    background:#0b2a19cc; backdrop-filter:blur(6px);
+  }
+  .bar.top{border-bottom:1px solid #ffffff1a}
+  .bar.bottom{border-top:1px solid #ffffff1a; gap:6px}
+  .brand{font-weight:700; font-size:15px; letter-spacing:.2px; white-space:nowrap}
+  .stats{display:flex; gap:6px; margin-left:auto; align-items:center}
+  .stat{
+    background:#ffffff14; border:1px solid #ffffff1f; border-radius:999px;
+    padding:4px 10px; font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .stat b{color:var(--gold); font-weight:700}
+
+  button{
+    font:inherit; color:var(--ink); background:#ffffff14; border:1px solid #ffffff24;
+    border-radius:12px; padding:10px 12px; cursor:pointer; font-weight:600; font-size:14px;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    transition:transform .07s, background .15s, opacity .15s; white-space:nowrap;
+  }
+  button:hover{background:#ffffff22}
+  button:active{transform:scale(.95)}
+  button:disabled{opacity:.35; cursor:default}
+  button.grow{flex:1; min-width:0}
+  button.primary{background:linear-gradient(135deg,#f2c14e,#e0a32e); color:#3a2a05; border-color:#0000}
+  button.ghost{background:#0000; border-color:#ffffff2e}
+  .icon{font-size:17px; line-height:1}
+  .blabel{font-size:13px}
+
+  /* ---------- tabuleiro ---------- */
+  #viewport{flex:1; position:relative; overflow:hidden; min-height:0; touch-action:none}
+  #board{position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform}
+
+  .tile{
+    position:absolute; border-radius:9%/7%;
+    background:linear-gradient(155deg,var(--tile-face) 0%, var(--tile-face) 55%, var(--tile-face2) 100%);
+    border:1px solid var(--tile-edge);
+    display:flex; align-items:center; justify-content:center;
+    user-select:none; -webkit-user-select:none;
+    transition:transform .12s, opacity .18s, filter .15s, box-shadow .15s;
+  }
+  .tile .face{
+    line-height:1; text-align:center; pointer-events:none;
+    display:flex; align-items:center; justify-content:center; width:100%; height:100%;
+  }
+  .tile .num{
+    font-weight:800; letter-spacing:-.02em; display:flex; align-items:center;
+    justify-content:center; width:80%; height:62%; border-radius:14%; font-size:.6em;
+    color:#fff;
+  }
+  .tile.removed{display:none}
+  .tile.blocked{filter:brightness(.72) saturate(.75)}
+  .tile.selected{
+    box-shadow:0 0 0 4px var(--gold), 0 0 22px 4px #f2c14e88;
+    transform:translateY(-3%) scale(1.04); z-index:99999 !important;
+  }
+  .tile.twin{box-shadow:0 0 0 3px #7fe0a3cc}
+  .tile.hint{animation:pulse 1s ease-in-out 3}
+  .tile.bad{animation:shake .35s}
+  .tile.vanish{animation:vanish .28s ease-in forwards}
+  @keyframes pulse{
+    0%,100%{box-shadow:0 0 0 0 #7fe0a300}
+    50%{box-shadow:0 0 0 5px #7fe0a3, 0 0 24px 6px #7fe0a377}
+  }
+  @keyframes shake{
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-4%)}
+    40%{transform:translateX(4%)} 60%{transform:translateX(-3%)} 80%{transform:translateX(3%)}
+  }
+  @keyframes vanish{
+    to{transform:scale(1.35) rotate(4deg); opacity:0}
+  }
+
+  /* ---------- diálogos ---------- */
+  .scrim{
+    position:fixed; inset:0; background:#000a; backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; padding:16px; z-index:1000;
+  }
+  .scrim[hidden]{display:none}
+  .card{
+    background:#12331f; border:1px solid #ffffff24; border-radius:18px; padding:18px;
+    width:min(420px,100%); max-height:86vh; overflow:auto; box-shadow:0 20px 60px #000a;
+  }
+  .card h2{margin:0 0 4px; font-size:20px}
+  .card p{margin:6px 0; color:var(--dim); font-size:14px}
+  .card h3{margin:16px 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim)}
+  .opts{display:flex; gap:8px; flex-wrap:wrap}
+  .opt{
+    flex:1 1 110px; background:#ffffff10; border:1px solid #ffffff24; border-radius:12px;
+    padding:10px; text-align:center; cursor:pointer; font-size:13px; font-weight:600;
+  }
+  .opt small{display:block; font-weight:500; color:var(--dim); font-size:11px; margin-top:2px}
+  .opt.sel{background:var(--gold); color:#3a2a05; border-color:#0000}
+  .opt.sel small{color:#3a2a05cc}
+  .switch{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 0; border-bottom:1px solid #ffffff14; font-size:14px;
+  }
+  .switch:last-of-type{border-bottom:0}
+  .switch input{width:20px; height:20px; accent-color:var(--gold)}
+  .actions{display:flex; gap:8px; margin-top:16px}
+  .actions button{flex:1}
+  .rules{font-size:14px; color:var(--dim); padding-left:18px; margin:6px 0}
+  .rules li{margin:5px 0}
+
+  #toast{
+    position:fixed; left:50%; bottom:96px; transform:translateX(-50%) translateY(8px);
+    background:#000d; border:1px solid #ffffff24; padding:9px 16px; border-radius:999px;
+    font-size:14px; opacity:0; pointer-events:none; transition:.22s; z-index:1200;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:430px){
+    .brand{display:none}
+    .blabel{display:none}
+    button{padding:11px 10px}
+    .icon{font-size:20px}
+  }
+</style>
+</head>
+<body>
+
+<div class="bar top">
+  <span class="brand">🀄 Mahjong</span>
+  <div class="stats">
+    <span class="stat">⏱ <b id="stTime">0:00</b></span>
+    <span class="stat">Peças <b id="stLeft">0</b></span>
+    <span class="stat" id="stMovesWrap">Jogadas <b id="stMoves">0</b></span>
+  </div>
+</div>
+
+<div id="viewport">
+  <div id="board"></div>
+</div>
+
+<div class="bar bottom">
+  <button class="grow" id="btnHint"><span class="icon">💡</span><span class="blabel">Dica</span></button>
+  <button class="grow" id="btnUndo"><span class="icon">↶</span><span class="blabel">Desfazer</span></button>
+  <button class="grow" id="btnShuffle"><span class="icon">🔀</span><span class="blabel">Embaralhar</span></button>
+  <button class="grow" id="btnZoom"><span class="icon">🔍</span><span class="blabel">Zoom</span></button>
+  <button class="grow" id="btnMenu"><span class="icon">⚙️</span><span class="blabel">Menu</span></button>
+</div>
+
+<!-- Menu -->
+<div class="scrim" id="dlgMenu" hidden>
+  <div class="card">
+    <h2>Menu</h2>
+    <h3>Tamanho do jogo</h3>
+    <div class="opts" id="optLayout"></div>
+    <h3>Desenho das peças</h3>
+    <div class="opts" id="optTheme"></div>
+    <h3>Ajustes</h3>
+    <label class="switch">Escurecer peças bloqueadas
+      <input type="checkbox" id="cfgDim"></label>
+    <label class="switch">Mostrar peças iguais ao selecionar
+      <input type="checkbox" id="cfgTwin"></label>
+    <label class="switch">Som
+      <input type="checkbox" id="cfgSound"></label>
+    <div class="actions">
+      <button class="ghost" id="btnHelp">Como jogar</button>
+      <button class="primary" id="btnNew">Novo jogo</button>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="btnCloseMenu">Voltar ao jogo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ajuda -->
+<div class="scrim" id="dlgHelp" hidden>
+  <div class="card">
+    <h2>Como jogar</h2>
+    <ol class="rules">
+      <li>Toque em <b>duas peças iguais</b> para removê-las.</li>
+      <li>Só valem peças <b>livres</b>: sem nada em cima e com o lado <b>esquerdo ou direito</b> desocupado.</li>
+      <li>As peças escuras estão bloqueadas — ainda não dá para usá-las.</li>
+      <li>Ganha quem tirar todas as peças da mesa.</li>
+    </ol>
+    <p><b>Nunca fica sem saída:</b> todo tabuleiro nasce com solução garantida. Se você travar,
+       use <b>↶ Desfazer</b> quantas vezes quiser, ou <b>🔀 Embaralhar</b> — o embaralhamento
+       também sempre gera uma mesa com solução.</p>
+    <div class="actions"><button class="primary" id="btnCloseHelp">Entendi</button></div>
+  </div>
+</div>
+
+<!-- Sem jogadas -->
+<div class="scrim" id="dlgStuck" hidden>
+  <div class="card">
+    <h2>Sem jogadas 😕</h2>
+    <p>Não sobrou nenhum par livre. Sem problema: dá para voltar atrás ou embaralhar as peças
+       que restaram — o embaralhamento garante uma mesa com solução.</p>
+    <div class="actions">
+      <button id="btnStuckUndo">↶ Desfazer</button>
+      <button class="primary" id="btnStuckShuffle">🔀 Embaralhar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Vitória -->
+<div class="scrim" id="dlgWin" hidden>
+  <div class="card" style="text-align:center">
+    <div style="font-size:52px">🎉</div>
+    <h2>Você ganhou!</h2>
+    <p id="winInfo"></p>
+    <div class="actions"><button class="primary" id="btnWinNew">Jogar de novo</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   1. Conjuntos de peças  (36 faces distintas, 4 cópias cada)
+   ============================================================ */
+const THEMES = {
+  bichos: {
+    name:'Frutas e bichos', sample:'🍎',
+    faces:['🍎','🍌','🍇','🍓','🍊','🍉','🍒','🥝','🍍','🥥','🥕','🌽',
+           '🐶','🐱','🐭','🐰','🦊','🐻','🐼','🐯','🦁','🐸','🐵','🐷',
+           '🐟','🐙','🦋','🐝','🐞','🦄','🐢','🦉','🐧','🦆','🐳','🦀']
+  },
+  natureza: {
+    name:'Natureza', sample:'🌻',
+    faces:['🌸','🌻','🌹','🌷','🌼','🍀','🌵','🌴','🍁','🍄','🌾','🌺',
+           '⭐','🌙','☀️','⚡','🔥','❄️','💧','🌈','☁️','🌊','🪐','✨',
+           '❤️','💎','🎈','🎁','🔔','⚽','🎵','🚗','✈️','⛵','🏠','🍰']
+  },
+  numeros: { name:'Números', sample:'12', faces:null } // gerado abaixo
+};
+// tema "Números": 1..36, com 6 cores em blocos de 6 — fácil de distinguir
+const NUM_COLORS = ['#d64545','#2f7fd1','#2f9e5e','#b8892f','#8b5cd6','#128d8d'];
+THEMES.numeros.faces = Array.from({length:36}, (_,i)=> 'n'+(i+1));
+
+/* --- tema clássico: peças de mahjong tradicionais, desenhadas em SVG --- */
+THEMES.classico = {
+  name:'Clássico chinês', sample:'中',
+  faces:['P1','P2','P3','P4','P5','P6','P7','P8','P9',
+         'B1','B2','B3','B4','B5','B6','B7','B8','B9',
+         'C1','C2','C3','C4','C5','C6','C7','C8','C9',
+         'WE','WS','WW','WN','DR','DG','DW','F1','F2']
+};
+
+const CJK = '"Noto Sans CJK SC","Noto Sans SC","Noto Serif CJK SC","Microsoft YaHei",' +
+            '"PingFang SC","Hiragino Sans","Yu Gothic","SimSun",serif';
+const AZUL='#1f5fa8', VERM='#c8392f', VERDE='#1c7a4a', TINTA='#23211c';
+
+const DOTS = {
+  1:[[30,40,15]],
+  2:[[30,25,9],[30,55,9]],
+  3:[[17,20,9],[30,40,9],[43,60,9]],
+  4:[[19,25,9],[41,25,9],[19,55,9],[41,55,9]],
+  5:[[18,22,8],[42,22,8],[30,40,8],[18,58,8],[42,58,8]],
+  6:[[19,18,8],[41,18,8],[19,40,8],[41,40,8],[19,62,8],[41,62,8]],
+  7:[[16,16,7],[30,16,7],[44,16,7],[21,40,7],[39,40,7],[21,62,7],[39,62,7]],
+  8:[[20,14,7],[40,14,7],[20,32,7],[40,32,7],[20,50,7],[40,50,7],[20,68,7],[40,68,7]],
+  9:[[16,18,7.5],[30,18,7.5],[44,18,7.5],[16,40,7.5],[30,40,7.5],[44,40,7.5],
+     [16,62,7.5],[30,62,7.5],[44,62,7.5]]
+};
+const BAMS = {
+  1:[[30,40]],
+  2:[[30,26],[30,56]],
+  3:[[30,20],[20,58],[40,58]],
+  4:[[20,26],[40,26],[20,56],[40,56]],
+  5:[[18,22],[42,22],[30,40],[18,58],[42,58]],
+  6:[[18,22],[30,22],[42,22],[18,58],[30,58],[42,58]],
+  7:[[30,16],[18,40],[30,40],[42,40],[18,64],[30,64],[42,64]],
+  8:[[18,20],[30,20],[42,20],[24,42],[36,42],[18,64],[30,64],[42,64]],
+  9:[[18,18],[30,18],[42,18],[18,40],[30,40],[42,40],[18,62],[30,62],[42,62]]
+};
+const CH_NUM = ['一','二','三','四','五','六','七','八','九'];
+
+function svgWrap(inner){
+  return '<svg viewBox="0 0 60 80" width="100%" height="100%" style="display:block">' + inner + '</svg>';
+}
+function drawDot(x,y,r,c){
+  return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+c+'"/>' +
+         '<circle cx="'+x+'" cy="'+y+'" r="'+(r*0.40)+'" fill="#fdfaf0"/>';
+}
+function drawBam(x,y,h,c){
+  const w = 7;
+  return '<rect x="'+(x-w/2)+'" y="'+(y-h/2)+'" width="'+w+'" height="'+h+'" rx="3" fill="'+c+'"/>' +
+         '<rect x="'+(x-w/2)+'" y="'+(y-h/6)+'" width="'+w+'" height="1.8" fill="#00000055"/>' +
+         '<rect x="'+(x-w/2)+'" y="'+(y+h/6)+'" width="'+w+'" height="1.8" fill="#00000055"/>';
+}
+function stackChars(top, topColor, bottom, bottomColor){
+  return '<span style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+         'height:100%;line-height:1;font-family:'+CJK+'">' +
+         '<span style="font-size:.52em;font-weight:700;color:'+topColor+'">'+top+'</span>' +
+         '<span style="font-size:.34em;color:'+bottomColor+';margin-top:.12em">'+bottom+'</span>' +
+         '</span>';
+}
+function bigChar(ch, color){
+  return '<span style="font-family:'+CJK+';font-size:.68em;font-weight:700;color:'+color+';line-height:1">' +
+         ch + '</span>';
+}
+
+function renderClassic(code){
+  const kind = code.charAt(0), rest = code.slice(1), v = parseInt(rest,10);
+
+  if(kind === 'P'){                                   // círculos
+    let s = '';
+    DOTS[v].forEach(function(d,i){
+      const red = (v===1) || (v===5 && i===2) || (v===9 && i===4);
+      s += drawDot(d[0], d[1], d[2], red ? VERM : AZUL);
+    });
+    return svgWrap(s);
+  }
+  if(kind === 'B'){                                   // bambus
+    const h = (v===1) ? 44 : (v<=4 ? 24 : (v<=6 ? 22 : 17));
+    let s = '';
+    BAMS[v].forEach(function(b,i){
+      const red = (v===5 && i===2) || (v===7 && i===0);
+      s += drawBam(b[0], b[1], h, red ? VERM : VERDE);
+    });
+    return svgWrap(s);
+  }
+  if(kind === 'C') return stackChars(CH_NUM[v-1], VERM, '萬', TINTA);   // caracteres
+  if(kind === 'W'){                                   // ventos
+    const m = {E:'東', S:'南', W:'西', N:'北'};
+    return bigChar(m[rest], AZUL);
+  }
+  if(kind === 'D'){                                   // dragões
+    if(rest === 'R') return bigChar('中', VERM);
+    if(rest === 'G') return bigChar('發', VERDE);
+    return svgWrap('<rect x="12" y="14" width="36" height="52" rx="4" fill="none" ' +
+                   'stroke="'+AZUL+'" stroke-width="3.5"/>');                 // dragão branco
+  }
+  if(kind === 'F') return bigChar(v === 1 ? '梅' : '竹', v === 1 ? VERM : VERDE); // flores
+  return code;
+}
+
+function renderFace(face){
+  if(face.charAt(0) === 'n' && /^n\d+$/.test(face)){
+    const v = parseInt(face.slice(1),10);
+    const c = NUM_COLORS[Math.floor((v-1)/6) % NUM_COLORS.length];
+    return '<span class="num" style="background:'+c+'">'+v+'</span>';
+  }
+  if(/^[PBCWDF]/.test(face) && face.length <= 2) return renderClassic(face);
+  return face;
+}
+
+/* ============================================================
+   2. Layouts  (posições em MEIAS-células: x = coluna*2, y = linha*2)
+      Cada peça ocupa 2x2 meias-células.
+   ============================================================ */
+function rect(list, z, c0, c1, r0, r1){
+  for(let r=r0; r<=r1; r++) for(let c=c0; c<=c1; c++) list.push({x:c*2, y:r*2, z:z});
+}
+
+const LAYOUTS = {
+  facil: { name:'Fácil', tiles:36, note:'2 camadas', build(){
+      const p=[]; rect(p,0,0,5,0,4); rect(p,1,2,3,1,3); return p; } },
+
+  medio: { name:'Médio', tiles:72, note:'3 camadas', build(){
+      const p=[]; rect(p,0,0,5,0,7); rect(p,1,1,4,2,5); rect(p,2,2,3,2,5); return p; } },
+
+  classico: { name:'Clássico', tiles:144, note:'tartaruga · use o zoom', build(){
+      const p=[];
+      const rows=[[1,12],[3,10],[2,11],[1,12],[1,12],[2,11],[3,10],[1,12]];
+      rows.forEach(function(cc,r){ for(let c=cc[0]; c<=cc[1]; c++) p.push({x:c*2, y:r*2, z:0}); });
+      p.push({x:0,  y:7, z:0});      // "orelha" esquerda, entre as linhas 3 e 4
+      p.push({x:26, y:7, z:0});      // cauda direita
+      p.push({x:28, y:7, z:0});
+      rect(p,1,4,9,1,6);
+      rect(p,2,5,8,2,5);
+      rect(p,3,6,7,3,4);
+      p.push({x:13, y:7, z:4});      // peça do topo, centralizada
+      return p; } },
+
+  grande: { name:'Grande', tiles:180, note:'4 camadas · em pé', build(){
+      const p=[];
+      rect(p,0,0,9,0,11); rect(p,1,2,7,3,8); rect(p,2,3,6,4,7); rect(p,3,4,5,4,7);
+      return p; } }
+};
+
+/* ============================================================
+   3. Regras de geometria: quem cobre quem, quem bloqueia os lados
+   ============================================================ */
+function buildRelations(list){
+  const n = list.length;
+  const above=[], left=[], right=[];
+  for(let i=0;i<n;i++){ above[i]=[]; left[i]=[]; right[i]=[]; }
+  for(let i=0;i<n;i++){
+    const a = list[i];
+    for(let j=0;j<n;j++){
+      if(i===j) continue;
+      const b = list[j];
+      if(b.z === a.z+1 && Math.abs(b.x-a.x) < 2 && Math.abs(b.y-a.y) < 2) above[i].push(j);
+      if(b.z === a.z && Math.abs(b.y-a.y) < 2){
+        if(b.x < a.x && b.x >= a.x-2) left[i].push(j);
+        if(b.x > a.x && b.x <= a.x+2) right[i].push(j);
+      }
+    }
+  }
+  return {above:above, left:left, right:right};
+}
+
+function anyAlive(idxs, alive){
+  for(let k=0;k<idxs.length;k++) if(alive[idxs[k]]) return true;
+  return false;
+}
+
+function isFreeIdx(i, rel, alive){
+  if(!alive[i]) return false;
+  if(anyAlive(rel.above[i], alive)) return false;
+  return !(anyAlive(rel.left[i], alive) && anyAlive(rel.right[i], alive));
+}
+
+function freeIndices(rel, alive){
+  const out=[];
+  for(let i=0;i<alive.length;i++) if(isFreeIdx(i, rel, alive)) out.push(i);
+  return out;
+}
+
+/* ============================================================
+   4. Geração SEMPRE solucionável
+      Resolve o tabuleiro de trás para frente: escolhe pares de peças
+      LIVRES e vai removendo. A ordem obtida é, por construção, uma
+      solução válida — depois basta pintar cada par com a mesma face.
+   ============================================================ */
+function shuffleArr(a){
+  for(let i=a.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    const t=a[i]; a[i]=a[j]; a[j]=t;
+  }
+  return a;
+}
+
+function tryOrder(list, rel, startAlive, deterministic){
+  const alive = Uint8Array.from(startAlive);
+  let remaining = 0;
+  for(let i=0;i<alive.length;i++) if(alive[i]) remaining++;
+  const order = [];
+  while(remaining > 0){
+    const free = freeIndices(rel, alive);
+    if(free.length < 2) return null;
+    shuffleArr(free);
+    // camadas de cima primeiro: reduz muito a chance de beco sem saída
+    free.sort(function(a,b){ return list[b].z - list[a].z; });
+    let a, b;
+    if(deterministic){
+      a = free[0]; b = free[1];
+    } else {
+      const pool = free.slice(0, Math.max(2, Math.min(free.length, 6)));
+      const i1 = Math.floor(Math.random()*pool.length);
+      let i2 = Math.floor(Math.random()*(pool.length-1));
+      if(i2 >= i1) i2++;
+      a = pool[i1]; b = pool[i2];
+    }
+    alive[a]=0; alive[b]=0; remaining-=2;
+    order.push([a,b]);
+  }
+  return order;
+}
+
+function findRemovalOrder(list, rel, startAlive){
+  const safe = tryOrder(list, rel, startAlive, true);   // estratégia garantida
+  for(let attempt=0; attempt<400; attempt++){
+    const o = tryOrder(list, rel, startAlive, false);   // variedade
+    if(o) return o;
+  }
+  return safe;                                          // sempre sobra o plano B
+}
+
+/* distribui as faces: cada face vira 2 pares (4 peças) */
+function facesForPairs(nPairs, themeKey){
+  const all = THEMES[themeKey].faces;
+  const nFaces = Math.min(all.length, Math.max(1, Math.ceil(nPairs/2)));
+  const bag = [];
+  for(let i=0;i<nPairs;i++) bag.push(all[i % nFaces]);
+  return shuffleArr(bag);
+}
+
+/* ============================================================
+   5. Estado do jogo
+   ============================================================ */
+const STORE = 'mahjong-mamae-v1';
+let G = null;
+let cfg = { layout:'facil', theme:'bichos', dim:true, twin:true, sound:true };
+
+function loadCfg(){
+  try{
+    const raw = localStorage.getItem(STORE+'-cfg');
+    if(raw) Object.assign(cfg, JSON.parse(raw));
+  }catch(e){}
+  if(!LAYOUTS[cfg.layout]) cfg.layout='facil';
+  if(!THEMES[cfg.theme]) cfg.theme='bichos';
+}
+function saveCfg(){ try{ localStorage.setItem(STORE+'-cfg', JSON.stringify(cfg)); }catch(e){} }
+
+function saveGame(){
+  if(!G) return;
+  try{
+    localStorage.setItem(STORE, JSON.stringify({
+      layout:G.layout, theme:G.theme,
+      faces:G.tiles.map(function(t){return t.face;}),
+      removed:G.tiles.map(function(t){return t.removed?1:0;}),
+      history:G.history, elapsed:elapsed(), moves:G.moves
+    }));
+  }catch(e){}
+}
+function clearSave(){ try{ localStorage.removeItem(STORE); }catch(e){} }
+
+function elapsed(){
+  if(!G) return 0;
+  return G.baseTime + (G.running ? (Date.now()-G.startedAt) : 0);
+}
+
+function newGame(layoutKey, themeKey){
+  const L = LAYOUTS[layoutKey] || LAYOUTS.facil;
+  const pos = L.build();
+  const rel = buildRelations(pos);
+  const alive = new Uint8Array(pos.length).fill(1);
+  const order = findRemovalOrder(pos, rel, alive);
+  const bag = facesForPairs(pos.length/2, themeKey);
+
+  const tiles = pos.map(function(p,i){
+    return {id:i, x:p.x, y:p.y, z:p.z, face:null, removed:false};
+  });
+  order.forEach(function(pair, i){
+    tiles[pair[0]].face = bag[i];
+    tiles[pair[1]].face = bag[i];
+  });
+
+  G = { layout:layoutKey, theme:themeKey, tiles:tiles, rel:rel,
+        selected:null, history:[], moves:0,
+        baseTime:0, startedAt:Date.now(), running:true };
+  buildDOM();
+  layoutBoard();
+  updateAll();
+  saveGame();
+}
+
+function restoreGame(){
+  let s;
+  try{ s = JSON.parse(localStorage.getItem(STORE) || 'null'); }catch(e){ return false; }
+  if(!s || !LAYOUTS[s.layout] || !THEMES[s.theme]) return false;
+  const pos = LAYOUTS[s.layout].build();
+  if(!s.faces || s.faces.length !== pos.length) return false;
+  const tiles = pos.map(function(p,i){
+    return {id:i, x:p.x, y:p.y, z:p.z, face:s.faces[i], removed:!!(s.removed && s.removed[i])};
+  });
+  G = { layout:s.layout, theme:s.theme, tiles:tiles, rel:buildRelations(pos),
+        selected:null, history:s.history || [], moves:s.moves || 0,
+        baseTime:s.elapsed || 0, startedAt:Date.now(), running:true };
+  cfg.layout = s.layout; cfg.theme = s.theme;
+  buildDOM(); layoutBoard(); updateAll();
+  return true;
+}
+
+function aliveMask(){
+  const a = new Uint8Array(G.tiles.length);
+  for(let i=0;i<G.tiles.length;i++) a[i] = G.tiles[i].removed ? 0 : 1;
+  return a;
+}
+function tilesLeft(){
+  let n=0; for(let i=0;i<G.tiles.length;i++) if(!G.tiles[i].removed) n++; return n;
+}
+
+/* pares jogáveis no momento */
+function availableMoves(alive){
+  const free = freeIndices(G.rel, alive);
+  const byFace = {}, moves = [];
+  for(let k=0;k<free.length;k++){
+    const i = free[k], f = G.tiles[i].face;
+    if(!byFace[f]) byFace[f] = [];
+    for(let m=0;m<byFace[f].length;m++) moves.push([byFace[f][m], i]);
+    byFace[f].push(i);
+  }
+  return moves;
+}
+
+/* simulação aleatória: consegue terminar a partir deste estado? */
+function playoutSolves(startAlive){
+  const alive = Uint8Array.from(startAlive);
+  let remaining = 0;
+  for(let i=0;i<alive.length;i++) if(alive[i]) remaining++;
+  while(remaining > 0){
+    const mv = availableMovesOn(alive);
+    if(!mv.length) return false;
+    const m = mv[Math.floor(Math.random()*mv.length)];
+    alive[m[0]]=0; alive[m[1]]=0; remaining -= 2;
+  }
+  return true;
+}
+function availableMovesOn(alive){
+  const free = freeIndices(G.rel, alive);
+  const byFace = {}, moves = [];
+  for(let k=0;k<free.length;k++){
+    const i = free[k], f = G.tiles[i].face;
+    if(!byFace[f]) byFace[f] = [];
+    for(let m=0;m<byFace[f].length;m++) moves.push([byFace[f][m], i]);
+    byFace[f].push(i);
+  }
+  return moves;
+}
+
+/* dica: procura um par que ainda leve à vitória; se não der tempo, devolve um par qualquer */
+function findHint(){
+  const alive = aliveMask();
+  const moves = availableMoves(alive);
+  if(!moves.length) return null;
+  const cand = shuffleArr(moves.slice());
+  const deadline = (window.performance ? performance.now() : Date.now()) + 350;
+  const now = function(){ return window.performance ? performance.now() : Date.now(); };
+  for(let k=0;k<cand.length;k++){
+    const m = cand[k];
+    const a = Uint8Array.from(alive);
+    a[m[0]]=0; a[m[1]]=0;
+    for(let t=0;t<20;t++){
+      if(playoutSolves(a)) return m;
+      if(now() > deadline) return cand[0];
+    }
+    if(now() > deadline) return cand[0];
+  }
+  return cand[0];
+}
+
+/* ============================================================
+   6. Desenho do tabuleiro
+   ============================================================ */
+const TW = 100, TH = 132;          // unidades internas
+const LX = 11, LY = 14;            // deslocamento por camada (para cima e para a esquerda)
+const boardEl = document.getElementById('board');
+const vpEl    = document.getElementById('viewport');
+let geo = {minL:0, minT:0, w:1, h:1};
+let zoomStep = 0, panX = 0, panY = 0;
+const ZOOMS = [1, 1.4, 1.9, 2.5];
+
+function tileRect(t){
+  return { l: (t.x/2)*TW - t.z*LX, tp: (t.y/2)*TH - t.z*LY };
+}
+
+function buildDOM(){
+  boardEl.innerHTML = '';
+  let minL=Infinity, minT=Infinity, maxL=-Infinity, maxT=-Infinity;
+  G.tiles.forEach(function(t){
+    const r = tileRect(t);
+    if(r.l < minL) minL = r.l;
+    if(r.tp < minT) minT = r.tp;
+    if(r.l + TW > maxL) maxL = r.l + TW;
+    if(r.tp + TH > maxT) maxT = r.tp + TH;
+  });
+  geo = {minL:minL, minT:minT, w:maxL-minL, h:maxT-minT};
+  boardEl.style.width  = geo.w + 'px';
+  boardEl.style.height = geo.h + 'px';
+
+  const frag = document.createDocumentFragment();
+  const ordered = G.tiles.slice().sort(function(a,b){
+    return (a.z-b.z) || (a.y-b.y) || (a.x-b.x);
+  });
+  ordered.forEach(function(t){
+    const r = tileRect(t);
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.dataset.id = t.id;
+    el.style.left   = (r.l - geo.minL) + 'px';
+    el.style.top    = (r.tp - geo.minT) + 'px';
+    el.style.width  = TW + 'px';
+    el.style.height = TH + 'px';
+    el.style.zIndex = (t.z*10000 + t.y*100 + t.x);
+    el.style.boxShadow =
+      '0 0 0 1px #00000022 inset, ' +
+      (LX*0.55)+'px '+(LY*0.55)+'px 0 -1px var(--tile-side), ' +
+      (LX*0.7)+'px '+(LY*0.7)+'px 10px #00000066';
+    el.innerHTML = '<span class="face" style="font-size:'+(TW*0.6)+'px">'+renderFace(t.face)+'</span>';
+    t.el = el;
+    frag.appendChild(el);
+  });
+  boardEl.appendChild(frag);
+}
+
+function layoutBoard(){
+  const vw = vpEl.clientWidth, vh = vpEl.clientHeight;
+  if(!vw || !vh || !G) return;
+  const fit = Math.min(vw/geo.w, vh/geo.h) * 0.97;
+  const s = fit * ZOOMS[zoomStep];
+  const w = geo.w*s, h = geo.h*s;
+  let tx, ty;
+  if(w <= vw){ tx = (vw-w)/2; panX = tx; } else { tx = Math.min(0, Math.max(vw-w, panX)); panX = tx; }
+  if(h <= vh){ ty = (vh-h)/2; panY = ty; } else { ty = Math.min(0, Math.max(vh-h, panY)); panY = ty; }
+  boardEl.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+s+')';
+}
+
+/* ============================================================
+   7. Atualização visual
+   ============================================================ */
+function updateAll(){
+  const alive = aliveMask();
+  const selFace = (G.selected !== null) ? G.tiles[G.selected].face : null;
+  G.tiles.forEach(function(t,i){
+    const el = t.el;
+    el.classList.toggle('removed', t.removed);
+    if(t.removed) return;
+    const free = isFreeIdx(i, G.rel, alive);
+    el.classList.toggle('blocked', cfg.dim && !free);
+    el.classList.toggle('selected', G.selected === i);
+    el.classList.toggle('twin',
+      cfg.twin && selFace !== null && G.selected !== i && free && t.face === selFace);
+  });
+  document.getElementById('stLeft').textContent  = tilesLeft();
+  document.getElementById('stMoves').textContent = G.moves;
+  document.getElementById('btnUndo').disabled    = G.history.length === 0;
+  tick();
+}
+
+function tick(){
+  if(!G) return;
+  const s = Math.floor(elapsed()/1000);
+  document.getElementById('stTime').textContent =
+    Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+setInterval(tick, 500);
+
+/* ============================================================
+   8. Som (opcional, bem discreto)
+   ============================================================ */
+let actx = null;
+function beep(freq, dur, type, vol){
+  if(!cfg.sound) return;
+  try{
+    if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if(actx.state === 'suspended') actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.value = vol || 0.06;
+    o.connect(g); g.connect(actx.destination);
+    const t0 = actx.currentTime;
+    g.gain.setValueAtTime(g.gain.value, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }catch(e){}
+}
+
+/* ============================================================
+   9. Interação
+   ============================================================ */
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ el.classList.remove('show'); }, 1600);
+}
+
+function clearHints(){
+  G.tiles.forEach(function(t){ if(t.el) t.el.classList.remove('hint'); });
+}
+
+function onTileTap(id){
+  if(!G) return;
+  const t = G.tiles[id];
+  if(!t || t.removed) return;
+  clearHints();
+  const alive = aliveMask();
+
+  if(!isFreeIdx(id, G.rel, alive)){
+    t.el.classList.remove('bad');
+    void t.el.offsetWidth;
+    t.el.classList.add('bad');
+    beep(180, .12, 'square', .04);
+    toast('Peça bloqueada');
+    return;
+  }
+  if(G.selected === id){ G.selected = null; updateAll(); return; }
+  if(G.selected === null){
+    G.selected = id; beep(660, .07, 'sine', .05); updateAll(); return;
+  }
+  const other = G.tiles[G.selected];
+  if(other.face === t.face){
+    removePair(G.selected, id);
+  } else {
+    G.selected = id; beep(660, .07, 'sine', .05); updateAll();
+  }
+}
+
+function removePair(a, b){
+  const ta = G.tiles[a], tb = G.tiles[b];
+  ta.el.classList.add('vanish');
+  tb.el.classList.add('vanish');
+  beep(880, .12, 'triangle', .07);
+  setTimeout(function(){
+    ta.el.classList.remove('vanish');
+    tb.el.classList.remove('vanish');
+  }, 300);
+  ta.removed = true; tb.removed = true;
+  G.history.push([a,b]);
+  G.moves++;
+  G.selected = null;
+  updateAll();
+  saveGame();
+
+  if(tilesLeft() === 0){ win(); return; }
+  setTimeout(function(){
+    if(G && tilesLeft() > 0 && availableMoves(aliveMask()).length === 0) show('dlgStuck');
+  }, 320);
+}
+
+function undo(){
+  if(!G || !G.history.length) return;
+  const pair = G.history.pop();
+  G.tiles[pair[0]].removed = false;
+  G.tiles[pair[1]].removed = false;
+  if(G.moves > 0) G.moves--;
+  G.selected = null;
+  clearHints();
+  hide('dlgStuck');
+  updateAll();
+  saveGame();
+  beep(420, .08, 'sine', .05);
+}
+
+/* embaralhar: reorganiza SÓ as peças que restaram, garantindo solução */
+function reshuffle(){
+  if(!G) return;
+  const alive = aliveMask();
+  const order = findRemovalOrder(G.tiles, G.rel, alive);
+  if(!order){ toast('Não consegui embaralhar'); return; }
+
+  const counts = {};
+  G.tiles.forEach(function(t){ if(!t.removed) counts[t.face] = (counts[t.face]||0) + 1; });
+  const bag = [];
+  Object.keys(counts).forEach(function(f){
+    for(let i=0;i<Math.floor(counts[f]/2);i++) bag.push(f);
+  });
+  shuffleArr(bag);
+  if(bag.length !== order.length){ toast('Não consegui embaralhar'); return; }
+
+  order.forEach(function(pair, i){
+    G.tiles[pair[0]].face = bag[i];
+    G.tiles[pair[1]].face = bag[i];
+  });
+  G.tiles.forEach(function(t){
+    if(t.el) t.el.innerHTML =
+      '<span class="face" style="font-size:'+(TW*0.6)+'px">'+renderFace(t.face)+'</span>';
+  });
+  G.selected = null;
+  clearHints();
+  hide('dlgStuck');
+  updateAll();
+  saveGame();
+  toast('Peças embaralhadas — com solução garantida');
+  beep(520, .12, 'triangle', .06);
+}
+
+function hint(){
+  if(!G) return;
+  clearHints();
+  const m = findHint();
+  if(!m){ show('dlgStuck'); return; }
+  G.selected = null;
+  updateAll();
+  G.tiles[m[0]].el.classList.add('hint');
+  G.tiles[m[1]].el.classList.add('hint');
+  beep(740, .1, 'sine', .05);
+}
+
+function win(){
+  G.running = false;
+  G.baseTime = elapsed();
+  clearSave();
+  const s = Math.floor(G.baseTime/1000);
+  document.getElementById('winInfo').textContent =
+    'Tempo: ' + Math.floor(s/60) + ' min ' + (s%60) + ' s  ·  ' + G.moves + ' jogadas';
+  show('dlgWin');
+  [523,659,784,1047].forEach(function(f,i){
+    setTimeout(function(){ beep(f, .18, 'triangle', .07); }, i*120);
+  });
+}
+
+/* ---------- diálogos ---------- */
+function show(id){ document.getElementById(id).hidden = false; }
+function hide(id){ document.getElementById(id).hidden = true; }
+
+/* ---------- pan / tap ---------- */
+let down = null;
+vpEl.addEventListener('pointerdown', function(e){
+  const tileEl = e.target.closest ? e.target.closest('.tile') : null;
+  down = {x:e.clientX, y:e.clientY, px:panX, py:panY, moved:false, tile:tileEl};
+});
+vpEl.addEventListener('pointermove', function(e){
+  if(!down) return;
+  const dx = e.clientX-down.x, dy = e.clientY-down.y;
+  if(!down.moved && Math.hypot(dx,dy) > 10) down.moved = true;
+  if(down.moved){ panX = down.px + dx; panY = down.py + dy; layoutBoard(); }
+});
+vpEl.addEventListener('pointerup', function(e){
+  if(!down) return;
+  if(!down.moved && down.tile) onTileTap(parseInt(down.tile.dataset.id, 10));
+  down = null;
+});
+vpEl.addEventListener('pointercancel', function(){ down = null; });
+
+/* ---------- botões ---------- */
+document.getElementById('btnHint').onclick    = hint;
+document.getElementById('btnUndo').onclick    = undo;
+document.getElementById('btnShuffle').onclick = reshuffle;
+document.getElementById('btnZoom').onclick    = function(){
+  zoomStep = (zoomStep+1) % ZOOMS.length;
+  layoutBoard();
+  toast(zoomStep === 0 ? 'Tela inteira' : 'Zoom ' + ZOOMS[zoomStep] + 'x — arraste para mover');
+};
+document.getElementById('btnMenu').onclick      = function(){ renderMenu(); show('dlgMenu'); };
+document.getElementById('btnCloseMenu').onclick = function(){ hide('dlgMenu'); };
+document.getElementById('btnHelp').onclick      = function(){ show('dlgHelp'); };
+document.getElementById('btnCloseHelp').onclick = function(){ hide('dlgHelp'); };
+document.getElementById('btnNew').onclick       = function(){
+  hide('dlgMenu'); clearSave(); zoomStep = 0; newGame(cfg.layout, cfg.theme);
+};
+document.getElementById('btnWinNew').onclick    = function(){
+  hide('dlgWin'); zoomStep = 0; newGame(cfg.layout, cfg.theme);
+};
+document.getElementById('btnStuckUndo').onclick    = function(){ hide('dlgStuck'); undo(); };
+document.getElementById('btnStuckShuffle').onclick = function(){ hide('dlgStuck'); reshuffle(); };
+
+function renderMenu(){
+  const oL = document.getElementById('optLayout'); oL.innerHTML = '';
+  Object.keys(LAYOUTS).forEach(function(k){
+    const L = LAYOUTS[k];
+    const d = document.createElement('div');
+    d.className = 'opt' + (cfg.layout === k ? ' sel' : '');
+    d.innerHTML = L.name + '<small>' + L.tiles + ' peças<br>' + L.note + '</small>';
+    d.onclick = function(){
+      cfg.layout = k; saveCfg(); renderMenu();
+      hide('dlgMenu'); clearSave(); zoomStep = 0; newGame(cfg.layout, cfg.theme);
+    };
+    oL.appendChild(d);
+  });
+  const oT = document.getElementById('optTheme'); oT.innerHTML = '';
+  Object.keys(THEMES).forEach(function(k){
+    const T = THEMES[k];
+    const d = document.createElement('div');
+    d.className = 'opt' + (cfg.theme === k ? ' sel' : '');
+    d.innerHTML = '<span style="font-size:22px">' + T.sample + '</span><small>' + T.name + '</small>';
+    d.onclick = function(){
+      cfg.theme = k; saveCfg();
+      // troca o desenho sem perder a partida em andamento
+      const all = THEMES[k].faces;
+      const map = {}; let next = 0;
+      G.tiles.forEach(function(t){
+        if(map[t.face] === undefined){ map[t.face] = all[next % all.length]; next++; }
+      });
+      G.tiles.forEach(function(t){
+        t.face = map[t.face];
+        if(t.el) t.el.innerHTML =
+          '<span class="face" style="font-size:'+(TW*0.6)+'px">'+renderFace(t.face)+'</span>';
+      });
+      G.theme = k;
+      renderMenu(); updateAll(); saveGame();
+    };
+    oT.appendChild(d);
+  });
+  document.getElementById('cfgDim').checked   = cfg.dim;
+  document.getElementById('cfgTwin').checked  = cfg.twin;
+  document.getElementById('cfgSound').checked = cfg.sound;
+}
+document.getElementById('cfgDim').onchange   = function(e){ cfg.dim = e.target.checked; saveCfg(); updateAll(); };
+document.getElementById('cfgTwin').onchange  = function(e){ cfg.twin = e.target.checked; saveCfg(); updateAll(); };
+document.getElementById('cfgSound').onchange = function(e){ cfg.sound = e.target.checked; saveCfg(); };
+
+window.addEventListener('resize', layoutBoard);
+window.addEventListener('orientationchange', function(){ setTimeout(layoutBoard, 250); });
+document.addEventListener('keydown', function(e){
+  if(e.key === 'z' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); undo(); }
+  else if(e.key === 'h') hint();
+});
+
+/* ---------- início ---------- */
+loadCfg();
+if(!restoreGame()) newGame(cfg.layout, cfg.theme);
+window.addEventListener('beforeunload', saveGame);
+
+if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+
+// exposto só para testes automatizados
+window.__mahjong = {
+  get G(){ return G; },
+  isFreeIdx: isFreeIdx, aliveMask: aliveMask, availableMoves: availableMoves,
+  playoutSolves: playoutSolves, onTileTap: onTileTap, newGame: newGame,
+  LAYOUTS: LAYOUTS, buildRelations: buildRelations, findRemovalOrder: findRemovalOrder
+};
+})();
+</script>
+</body>
+</html>
