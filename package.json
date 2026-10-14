@@ -1,0 +1,16 @@
+{
+  "name": "mahjong-da-mamae",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Mahjong Solitaire standalone, offline e em português",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,5 +1,5 @@
 /* Service worker: guarda o jogo no aparelho para funcionar sem internet. */
-var CACHE = 'mahjong-mamae-v1';
+var CACHE = 'mahjong-mamae-v2';
 var ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function(e){
@@ -14,7 +14,7 @@ self.addEventListener('activate', function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
       return Promise.all(keys.map(function(k){
-        return k === CACHE ? null : caches.delete(k);
+        return k.indexOf('mahjong-mamae-') === 0 && k !== CACHE ? caches.delete(k) : null;
       }));
     }).then(function(){ return self.clients.claim(); })
   );

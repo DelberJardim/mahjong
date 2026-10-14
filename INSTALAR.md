@@ -27,7 +27,11 @@ arquivos estejam num endereço `https://`. Hospedagem grátis e permanente, uma 
 
 Pronto: ícone na tela inicial. A partir daí abre offline, e o jogo já está inteiro no aparelho.
 
-Para atualizar o jogo depois, é só subir o `index.html` novo no mesmo repositório.
+Para atualizar o jogo depois, suba juntos o `index.html` e o `sw.js` novos no mesmo
+repositório (ou todos os arquivos de `dist/`). O `sw.js` desta correção usa o cache
+`mahjong-mamae-v2`, para substituir a versão anterior no aparelho. Abra o app
+conectado à internet, aguarde a atualização e feche e abra novamente para usar a
+versão nova. A partida salva continua disponível.
 
 ---
 
