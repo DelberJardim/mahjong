@@ -109,4 +109,7 @@ em que não sobra nenhum par.
 
 ## Instalar no celular
 
-Ver as opções no arquivo `INSTALAR.md`.
+Ver as opções no arquivo `INSTALAR.md`. Há também um
+[APK assinado para Android 7 ou superior](https://delberjardim.github.io/mahjong/downloads/mahjong-mamae.apk).
+O APK usa o jogo publicado; a primeira abertura precisa de internet. Código
+Android e instruções de build ficam em `android/`.

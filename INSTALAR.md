@@ -1,10 +1,11 @@
 # Como colocar o Mahjong no celular Android
 
-Antes de tudo, uma informação honesta: **não dá para gerar um `.apk` aqui.**
-Um APK de verdade exige o Android SDK (Java + Gradle, alguns gigabytes de ferramentas),
-que não está instalado nesta máquina. Mas existe um caminho que dá **exatamente o mesmo
-resultado prático** — um ícone na tela inicial, abrindo em tela cheia, funcionando sem
-internet, sem cara de site.
+O jogo pode ser instalado pelo navegador ou pelo APK assinado publicado neste
+repositório. As duas opções colocam um ícone na tela inicial.
+
+**Jogo:** https://delberjardim.github.io/mahjong/
+
+**APK Android:** https://delberjardim.github.io/mahjong/downloads/mahjong-mamae.apk
 
 ---
 
@@ -52,18 +53,23 @@ um ícone de aplicativo.
 
 ---
 
-## Opção C — Um `.apk` de verdade, para instalar como app da loja
+## Opção C — Baixar e instalar o APK
 
-Depois de fazer a **Opção A** (é pré-requisito — o PWABuilder precisa de um endereço público):
+1. Abra o [link do APK](https://delberjardim.github.io/mahjong/downloads/mahjong-mamae.apk)
+   no celular Android e baixe o arquivo.
+2. Abra o arquivo baixado. Se o Android solicitar, permita que o navegador ou
+   o app Arquivos instale esse aplicativo.
+3. Toque em **Instalar** e depois em **Abrir**.
+4. Na primeira abertura, mantenha a internet conectada para carregar o jogo e
+   seus arquivos offline. Depois, o botão **Menu → Atualizar** mantém o jogo atual.
 
-1. Abra **pwabuilder.com** e cole o endereço `https://SEU-USUARIO.github.io/mahjong/`.
-2. Clique em **Package for stores → Android → Download**.
-3. Copie o `.apk` gerado para o celular e toque nele para instalar.
-4. O Android vai pedir para liberar **"Instalar apps de fontes desconhecidas"** para o app
-   que está abrindo o arquivo (Arquivos ou Chrome). É só autorizar.
+O APK é compatível com **Android 7 ou superior**. Ele abre o jogo publicado no
+GitHub dentro do aplicativo, usando o Android System WebView. A partida fica
+salva dentro desse aplicativo; os dados do navegador pertencem à instalação PWA.
 
-Vale lembrar: o resultado é praticamente igual ao da Opção A, com uns passos a mais.
-Por isso a Opção A é a recomendada.
+O código Android está em `android/`; a assinatura e o conteúdo do pacote foram
+verificados com as ferramentas oficiais do SDK. A instalação e a abertura ainda
+não foram verificadas em aparelho ou emulador Android.
 
 ---
 

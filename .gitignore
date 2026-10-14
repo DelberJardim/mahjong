@@ -1,3 +1,9 @@
 node_modules/
 dist/
 test-results/
+android/build/
+*.p12
+*.jks
+*.keystore
+*.dpapi
+*.idsig
