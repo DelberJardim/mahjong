@@ -1,6 +1,6 @@
 {
   "name": "mahjong-da-mamae",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Mahjong Solitaire standalone, offline e em português",
   "scripts": {

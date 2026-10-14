@@ -28,11 +28,17 @@ usava somente o começo do catálogo, deixando categorias inteiras fora do jogo.
   para os temas de 36 faces. Os tamanhos e as regras de geometria continuam iguais.
 - Identificadores F1/F2, chave de salvamento e significado dos desenhos mantidos.
 - Mapeamento clássico aceita apenas códigos válidos, incluindo F1–F4 e S1–S4.
-- Cache do PWA atualizado para v2; limpeza limitada aos caches do Mahjong.
+- Cache do PWA atualizado para v3; limpeza limitada aos caches do Mahjong.
+- Menu com Atualizar: renova todos os arquivos offline, inclusive o endereço
+  com parâmetro de versão, e recarrega preservando a partida. Aguarda a ativação
+  do novo worker e também funciona quando somente o HTML foi modificado.
+- Confirmação de embaralhamento no botão principal e no aviso de falta de
+  jogadas. Cancelar ou Escape mantém o tabuleiro; confirmar reorganiza as peças
+  restantes. O diálogo recebe foco e mantém a navegação por Tab dentro dele.
 
 ## Validação
 
-`node --test --test-concurrency=1 tests/*.test.cjs`: **11 testes aprovados**,
+`node --test --test-concurrency=1 tests/*.test.cjs`: **17 testes aprovados**,
 com Playwright 1.62.1 e Microsoft Edge em modo headless no Windows.
 
 - 150 faces verificadas: 42 clássicas + 36 frutas/bichos + 36 natureza + 36 números.
@@ -42,7 +48,12 @@ com Playwright 1.62.1 e Microsoft Edge em modo headless no Windows.
 - Seleção por clique real, remoção, desfazer, dica, embaralhamento e zoom conferidos.
 - Salvamento antigo restaurado com os mesmos códigos, desenhos e tempo acumulado.
 - HTML standalone e PWA funcionam offline, com fonte disponível.
-- Atualização simulada de service worker v1 para v2 confirmada; caches alheios preservados.
+- Atualização simulada de service worker v2 para v3 confirmada; caches alheios preservados.
+- Confirmação, cancelamento e Escape conferidos; o aviso de falta de jogadas permanece ao cancelar.
+- Atualizar pelo menu substitui HTML antigo em cache mesmo sem mudança no worker.
+  A partida com peças retiradas é preservada após recarregar e depois funciona offline.
+- Falta de internet e erro HTTP em um asset preservam cache e partida e permitem nova tentativa.
+- O botão Atualizar no HTML local orienta a abrir o link online e mantém a partida.
 - JavaScript, UTF-8, manifesto, dimensões dos ícones e caminhos de assets conferidos.
 - Build estático com seis arquivos, idênticos às fontes, gerado em `dist/`.
 

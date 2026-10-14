@@ -29,10 +29,13 @@ o jogo funciona igual — só não vira um ícone na tela inicial.
 - **💡 Dica** — mostra um par. A dica procura um par que ainda leve à vitória,
   não apenas um par qualquer.
 - **↶ Desfazer** — ilimitado, volta jogada por jogada.
-- **🔀 Embaralhar** — reorganiza só as peças restantes, sempre gerando uma mesa com solução.
+- **🔀 Embaralhar** — pede confirmação e reorganiza só as peças restantes, sempre gerando uma mesa com solução.
 - **🔍 Zoom** — 1x → 1,4x → 1,9x → 2,5x. Com zoom, arraste para mover o tabuleiro.
 - **⚙️ Menu** — tamanho (36/72/144/180 peças), desenho das peças (frutas e bichos,
   natureza, números, clássico chinês) e ajustes.
+- **↻ Atualizar**, dentro do Menu — busca a versão mais recente pela internet e
+  reabre o jogo mantendo a partida salva. Se o download falhar, a partida e a
+  versão offline anterior ficam disponíveis para tentar novamente.
 
 A partida é salva sozinha: pode fechar e voltar depois que continua de onde parou.
 
@@ -71,7 +74,9 @@ Os testes conferem as 42 faces clássicas e as 108 faces dos demais temas,
 os 16 conjuntos de tema/tamanho, cores e fonte no desktop e celular, troca de
 tema sem alterar pares, seleção, remoção, desfazer, dica, embaralhamento, zoom,
 restauração de partidas antigas, arquivos locais, atualização do cache e PWA
-offline. Capturas de tela são salvas em `test-results/` para conferência visual.
+offline. Também conferem cancelar e confirmar embaralhamento nos dois botões,
+atualizar pelo Menu, preservar a partida na atualização e tratar falta de rede
+ou falha de download. Capturas de tela são salvas em `test-results/` para conferência visual.
 
 ## A garantia de "nunca ficar sem saída"
 

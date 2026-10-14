@@ -29,9 +29,13 @@ Pronto: ícone na tela inicial. A partir daí abre offline, e o jogo já está i
 
 Para atualizar o jogo depois, suba juntos o `index.html` e o `sw.js` novos no mesmo
 repositório (ou todos os arquivos de `dist/`). O `sw.js` desta correção usa o cache
-`mahjong-mamae-v2`, para substituir a versão anterior no aparelho. Abra o app
+`mahjong-mamae-v3`, para substituir a versão anterior no aparelho. Abra o app
 conectado à internet, aguarde a atualização e feche e abra novamente para usar a
 versão nova. A partida salva continua disponível.
+
+Depois de carregar esta versão, o botão **Menu → Atualizar** busca os arquivos
+mais recentes e reabre o jogo, preservando a partida. É preciso estar conectado
+à internet para baixar uma atualização.
 
 ---
 

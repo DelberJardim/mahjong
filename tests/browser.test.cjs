@@ -7,7 +7,7 @@ const http = require('node:http');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
 const { root } = require('../scripts/build.cjs');
-let browser, server, url;
+let browser, server, url, failAsset = null;
 const errors = [];
 const results = path.join(root, 'test-results');
 
@@ -15,6 +15,7 @@ before(async () => {
   fs.mkdirSync(results, { recursive: true });
   server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;
+    if(pathname === failAsset){ res.writeHead(503); res.end(); return; }
     const file = path.join(root, pathname === '/' ? 'index.html' : pathname.slice(1));
     if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       res.writeHead(404); res.end(); return;
@@ -195,6 +196,7 @@ test('selecionar/remover, desfazer, dica, embaralhar e zoom continuam funcionand
   assert.equal(await page.locator('#stLeft').textContent(), '36');
   const before = await page.evaluate(() => window.__mahjong.G.tiles.map(t => t.face).sort());
   await page.locator('#btnShuffle').click();
+  await page.locator('#btnConfirmShuffle').click();
   const shuffled = await page.evaluate(() => {
     const api = window.__mahjong;
     return { faces: api.G.tiles.map(t => t.face).sort(), valid: api.G.tiles.every(t =>
@@ -236,10 +238,10 @@ test('o index.html sozinho carrega a fonte e todas as faces sem rede', async () 
   await context.close();
 });
 
-test('atualização do PWA substitui cache v1, preserva caches alheios e funciona offline', async () => {
+test('atualização do PWA substitui cache v2, preserva caches alheios e funciona offline', async () => {
   const context = await browser.newContext();
   await context.route('**/sw.js', route => route.fulfill({ contentType: 'text/javascript', body: `
-    self.addEventListener('install', e => e.waitUntil(caches.open('mahjong-mamae-v1').then(c =>
+    self.addEventListener('install', e => e.waitUntil(caches.open('mahjong-mamae-v2').then(c =>
       c.put('./index.html', new Response('<html><body>VERSAO_ANTIGA</body></html>', {headers:{'Content-Type':'text/html'}}))).then(() => self.skipWaiting())));
     self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
     self.addEventListener('fetch', e => { if(e.request.mode === 'navigate') e.respondWith(caches.match('./index.html')); });
@@ -255,8 +257,8 @@ test('atualização do PWA substitui cache v1, preserva caches alheios e funcion
     await (await navigator.serviceWorker.getRegistration()).update();
     await changed;
   });
-  await page.waitForFunction(async () => (await caches.keys()).includes('mahjong-mamae-v2') &&
-    !(await caches.keys()).includes('mahjong-mamae-v1'));
+  await page.waitForFunction(async () => (await caches.keys()).includes('mahjong-mamae-v3') &&
+    !(await caches.keys()).includes('mahjong-mamae-v2'));
   await page.reload();
   assert.equal(await page.evaluate(() => !!window.__mahjong), true);
   assert(await page.evaluate(async () => (await caches.keys()).includes('outro-aplicativo')));
@@ -266,6 +268,139 @@ test('atualização do PWA substitui cache v1, preserva caches alheios e funcion
   await atlas(page, 'classico');
   assert.equal(await page.locator('#atlas .tile').count(), 42);
   assert(await page.evaluate(() => document.fonts.check('700 40px "Mahjong Symbols"', '發蘭菊春夏秋冬')));
+  await context.close();
+});
+
+async function gameState(page){
+  return page.evaluate(() => {
+    const g = window.__mahjong.G;
+    return { layout:g.layout, theme:g.theme, faces:g.tiles.map(t => t.face),
+      removed:g.tiles.map(t => t.removed), history:g.history, selected:g.selected, moves:g.moves };
+  });
+}
+async function workerReady(page){
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+}
+
+test('embaralhar pede confirmação; cancelar e Escape preservam a partida, confirmar preserva as peças retiradas', async () => {
+  const { page, context } = await open({ width:390, height:844 });
+  await page.evaluate(() => {
+    const api = window.__mahjong;
+    api.newGame('facil', 'classico');
+    const pair = api.availableMoves(api.aliveMask())[0];
+    pair.forEach(api.onTileTap);
+    api.onTileTap(api.availableMoves(api.aliveMask())[0][0]);
+  });
+  const before = await gameState(page);
+  await page.locator('#btnShuffle').click();
+  assert(await page.locator('#dlgShuffle').isVisible());
+  assert.deepEqual(await gameState(page), before);
+  await page.screenshot({ path:path.join(results, 'confirm-shuffle-mobile.png') });
+  await page.locator('#btnCancelShuffle').click();
+  assert(await page.locator('#dlgShuffle').isHidden());
+  assert.deepEqual(await gameState(page), before);
+  await page.locator('#btnShuffle').click();
+  await page.keyboard.press('Escape');
+  assert(await page.locator('#dlgShuffle').isHidden());
+  assert.deepEqual(await gameState(page), before);
+  await page.locator('#btnShuffle').click();
+  await page.locator('#btnConfirmShuffle').click();
+  const shuffled = await gameState(page);
+  assert.deepEqual(shuffled.faces.slice().sort(), before.faces.slice().sort());
+  assert.deepEqual(shuffled.removed, before.removed);
+  assert.deepEqual(shuffled.history, before.history);
+  assert.equal(shuffled.selected, null);
+  assert(await page.locator('#dlgShuffle').isHidden());
+  assert.match(await page.locator('#toast').textContent(), /Peças embaralhadas/);
+  await context.close();
+});
+
+test('embaralhar no aviso de falta de jogadas também exige confirmação e mantém o aviso ao cancelar', async () => {
+  const { page, context } = await open();
+  await page.evaluate(() => { document.getElementById('dlgStuck').hidden = false; });
+  const before = await gameState(page);
+  await page.locator('#btnStuckShuffle').click();
+  assert(await page.locator('#dlgShuffle').isVisible());
+  await page.locator('#btnCancelShuffle').click();
+  assert(await page.locator('#dlgStuck').isVisible());
+  assert.deepEqual(await gameState(page), before);
+  await page.locator('#btnStuckShuffle').click();
+  await page.locator('#btnConfirmShuffle').click();
+  assert(await page.locator('#dlgShuffle').isHidden());
+  assert(await page.locator('#dlgStuck').isHidden());
+  assert.match(await page.locator('#toast').textContent(), /Peças embaralhadas/);
+  await context.close();
+});
+
+test('Atualizar busca arquivos novos mesmo com worker igual e link com query, mantendo a partida e o uso offline', async () => {
+  const { page, context } = await open({ width:390, height:844 }, url + '/?v=menu-test');
+  await workerReady(page);
+  await page.evaluate(() => {
+    const api = window.__mahjong;
+    api.newGame('medio', 'classico');
+    api.availableMoves(api.aliveMask())[0].forEach(api.onTileTap);
+  });
+  const before = await gameState(page);
+  await page.evaluate(async () => {
+    const cache = await caches.open('mahjong-mamae-v3');
+    const html = await (await cache.match('./index.html')).text();
+    await cache.put(location.href, new Response(html.replace('<html lang="pt-BR">',
+      '<html lang="pt-BR" data-test-build="antigo">'), {headers:{'Content-Type':'text/html'}}));
+  });
+  await page.reload();
+  assert.equal(await page.locator('html').getAttribute('data-test-build'), 'antigo');
+  await page.locator('#btnMenu').click();
+  await page.screenshot({ path:path.join(results, 'menu-update-mobile.png') });
+  await Promise.all([page.waitForNavigation(), page.locator('#btnUpdate').click()]);
+  assert.equal(await page.locator('html').getAttribute('data-test-build'), null);
+  assert.deepEqual(await gameState(page), before);
+  await context.setOffline(true);
+  await page.reload();
+  assert.equal(await page.locator('html').getAttribute('data-test-build'), null);
+  assert.deepEqual(await gameState(page), before);
+  await context.close();
+});
+
+test('Atualizar sem internet mantém a partida e permite tentar novamente', async () => {
+  const { page, context } = await open();
+  await workerReady(page);
+  const before = await gameState(page);
+  await context.setOffline(true);
+  await page.locator('#btnMenu').click();
+  await page.locator('#btnUpdate').click();
+  assert.match(await page.locator('#toast').textContent(), /Conecte-se à internet/);
+  assert(await page.locator('#btnUpdate').isEnabled());
+  assert.deepEqual(await gameState(page), before);
+  await context.close();
+});
+
+test('se um download falha, Atualizar conserva o cache anterior e a partida', async () => {
+  const { page, context } = await open();
+  await workerReady(page);
+  const before = await gameState(page);
+  const oldCache = await page.evaluate(async () => (await (await caches.open('mahjong-mamae-v3')).match('./index.html')).text());
+  try{
+    failAsset = '/icon-512.png';
+    await page.locator('#btnMenu').click();
+    await page.locator('#btnUpdate').click();
+    await page.waitForFunction(() => !document.getElementById('btnUpdate').disabled);
+    assert.match(await page.locator('#toast').textContent(), /Não foi possível atualizar/);
+    assert.deepEqual(await gameState(page), before);
+    assert.equal(await page.evaluate(async () => (await (await caches.open('mahjong-mamae-v3')).match('./index.html')).text()), oldCache);
+  }finally{
+    failAsset = null;
+    await context.close();
+  }
+});
+
+test('Atualizar no HTML local orienta a abrir o link online e preserva o jogo', async () => {
+  const { page, context } = await open(undefined, pathToFileURL(path.join(root, 'index.html')).href);
+  const before = await gameState(page);
+  await page.locator('#btnMenu').click();
+  await page.locator('#btnUpdate').click();
+  assert.match(await page.locator('#toast').textContent(), /Abra o link online/);
+  assert.deepEqual(await gameState(page), before);
   await context.close();
 });
 

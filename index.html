@@ -306,6 +306,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       <button class="primary" id="btnNew">Novo jogo</button>
     </div>
     <div class="actions">
+      <button class="ghost" id="btnUpdate">↻ Atualizar</button>
       <button class="ghost" id="btnCloseMenu">Voltar ao jogo</button>
     </div>
   </div>
@@ -337,6 +338,18 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <div class="actions">
       <button id="btnStuckUndo">↶ Desfazer</button>
       <button class="primary" id="btnStuckShuffle">🔀 Embaralhar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmar embaralhamento -->
+<div class="scrim" id="dlgShuffle" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="shuffleTitle">
+    <h2 id="shuffleTitle">Embaralhar as peças?</h2>
+    <p>Vamos reorganizar as peças que ainda estão no tabuleiro.</p>
+    <div class="actions">
+      <button class="ghost" id="btnCancelShuffle">Cancelar</button>
+      <button class="primary" id="btnConfirmShuffle">Embaralhar</button>
     </div>
   </div>
 </div>
@@ -976,6 +989,19 @@ function undo(){
   beep(420, .08, 'sine', .05);
 }
 
+let shuffleOrigin = null;
+function requestShuffle(){
+  if(!G || tilesLeft() === 0) return;
+  shuffleOrigin = document.activeElement;
+  show('dlgShuffle');
+  document.getElementById('btnCancelShuffle').focus();
+}
+function closeShuffle(){
+  hide('dlgShuffle');
+  if(shuffleOrigin && !shuffleOrigin.closest('[hidden]')) shuffleOrigin.focus();
+  shuffleOrigin = null;
+}
+
 /* embaralhar: reorganiza SÓ as peças que restaram, garantindo solução */
 function reshuffle(){
   if(!G) return;
@@ -1038,6 +1064,64 @@ function win(){
 function show(id){ document.getElementById(id).hidden = false; }
 function hide(id){ document.getElementById(id).hidden = true; }
 
+/* Atualiza os arquivos offline antes de recarregar, mantendo a partida salva. */
+function activatedWorker(registration){
+  const worker = registration.installing || registration.waiting || registration.active;
+  if(!worker) return Promise.reject(new Error('Sem atualização disponível'));
+  if(worker.state === 'activated') return Promise.resolve(worker);
+  return new Promise(function(resolve, reject){
+    const timeout = setTimeout(function(){ finish(new Error('Tempo esgotado')); }, 20000);
+    function finish(error){
+      clearTimeout(timeout);
+      worker.removeEventListener('statechange', changed);
+      if(error) reject(error); else resolve(worker);
+    }
+    function changed(){
+      if(worker.state === 'activated') finish();
+      else if(worker.state === 'redundant') finish(new Error('Atualização interrompida'));
+    }
+    worker.addEventListener('statechange', changed);
+    changed();
+  });
+}
+function refreshAppFiles(worker){
+  return new Promise(function(resolve, reject){
+    const channel = new MessageChannel();
+    const timeout = setTimeout(function(){ finish(new Error('Tempo esgotado')); }, 20000);
+    function finish(error){
+      clearTimeout(timeout);
+      channel.port1.close();
+      if(error) reject(error); else resolve();
+    }
+    channel.port1.onmessage = function(event){
+      finish(event.data && event.data.ok ? null : new Error('Falha ao baixar atualização'));
+    };
+    worker.postMessage({type:'UPDATE_APP'}, [channel.port2]);
+  });
+}
+async function updateApp(){
+  if(!('serviceWorker' in navigator) || location.protocol.indexOf('http') !== 0){
+    toast('Abra o link online para atualizar.'); return;
+  }
+  if(!navigator.onLine){ toast('Conecte-se à internet para atualizar.'); return; }
+  const button = document.getElementById('btnUpdate');
+  if(button.disabled) return;
+  const label = button.textContent;
+  button.disabled = true; button.textContent = 'Atualizando…';
+  try{
+    let registration = await navigator.serviceWorker.getRegistration();
+    if(!registration) registration = await navigator.serviceWorker.register('sw.js', {updateViaCache:'none'});
+    await registration.update();
+    await refreshAppFiles(await activatedWorker(registration));
+    saveGame();
+    window.location.reload();
+  }catch(error){
+    toast('Não foi possível atualizar. Tente novamente.');
+  }finally{
+    button.disabled = false; button.textContent = label;
+  }
+}
+
 /* ---------- pan / tap ---------- */
 let down = null;
 vpEl.addEventListener('pointerdown', function(e){
@@ -1060,7 +1144,9 @@ vpEl.addEventListener('pointercancel', function(){ down = null; });
 /* ---------- botões ---------- */
 document.getElementById('btnHint').onclick    = hint;
 document.getElementById('btnUndo').onclick    = undo;
-document.getElementById('btnShuffle').onclick = reshuffle;
+document.getElementById('btnShuffle').onclick = requestShuffle;
+document.getElementById('btnCancelShuffle').onclick = closeShuffle;
+document.getElementById('btnConfirmShuffle').onclick = function(){ closeShuffle(); reshuffle(); };
 document.getElementById('btnZoom').onclick    = function(){
   zoomStep = (zoomStep+1) % ZOOMS.length;
   layoutBoard();
@@ -1068,6 +1154,7 @@ document.getElementById('btnZoom').onclick    = function(){
 };
 document.getElementById('btnMenu').onclick      = function(){ renderMenu(); show('dlgMenu'); };
 document.getElementById('btnCloseMenu').onclick = function(){ hide('dlgMenu'); };
+document.getElementById('btnUpdate').onclick    = updateApp;
 document.getElementById('btnHelp').onclick      = function(){ show('dlgHelp'); };
 document.getElementById('btnCloseHelp').onclick = function(){ hide('dlgHelp'); };
 document.getElementById('btnNew').onclick       = function(){
@@ -1077,7 +1164,7 @@ document.getElementById('btnWinNew').onclick    = function(){
   hide('dlgWin'); zoomStep = 0; newGame(cfg.layout, cfg.theme);
 };
 document.getElementById('btnStuckUndo').onclick    = function(){ hide('dlgStuck'); undo(); };
-document.getElementById('btnStuckShuffle').onclick = function(){ hide('dlgStuck'); reshuffle(); };
+document.getElementById('btnStuckShuffle').onclick = requestShuffle;
 
 function renderMenu(){
   const oL = document.getElementById('optLayout'); oL.innerHTML = '';
@@ -1129,6 +1216,16 @@ document.getElementById('cfgSound').onchange = function(e){ cfg.sound = e.target
 window.addEventListener('resize', layoutBoard);
 window.addEventListener('orientationchange', function(){ setTimeout(layoutBoard, 250); });
 document.addEventListener('keydown', function(e){
+  if(!document.getElementById('dlgShuffle').hidden){
+    if(e.key === 'Escape'){ e.preventDefault(); closeShuffle(); }
+    else if(e.key === 'Tab'){
+      const cancel = document.getElementById('btnCancelShuffle');
+      const confirm = document.getElementById('btnConfirmShuffle');
+      if(e.shiftKey && document.activeElement === cancel){ e.preventDefault(); confirm.focus(); }
+      else if(!e.shiftKey && document.activeElement === confirm){ e.preventDefault(); cancel.focus(); }
+    }
+    return;
+  }
   if(e.key === 'z' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); undo(); }
   else if(e.key === 'h') hint();
 });
@@ -1139,7 +1236,7 @@ if(!restoreGame()) newGame(cfg.layout, cfg.theme);
 window.addEventListener('beforeunload', saveGame);
 
 if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
-  navigator.serviceWorker.register('sw.js').catch(function(){});
+  navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).catch(function(){});
 }
 
 // exposto só para testes automatizados
